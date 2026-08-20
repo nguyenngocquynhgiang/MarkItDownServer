@@ -85,3 +85,5 @@ Dự án này không chỉ là một ứng dụng CRUD thông thường mà còn
 3.  **Clean Code & Modular Design**: Tách biệt rõ ràng tầng API (FastAPI) và tầng logic xử lý AI (LangChain/VectorDB).
 4.  **Tư duy hệ thống**: Áp dụng các phương pháp bảo mật (Security headers), tối ưu luồng (Rate limiting), phân mảnh file (Chunking strategy dựa trên Markdown headers thay vì cắt ký tự mù quáng).
 5.  **Kinh nghiệm xử lý sự cố thực tế**: Hiểu rõ và xử lý triệt để các vấn đề Encoding (UTF-8 vs cp1252) thường gặp khi triển khai hệ thống đa nền tảng (Windows/Linux), giúp log và hệ thống chạy mượt mà với dữ liệu tiếng Việt.
+
+This project is built upon the original [MarkItDownServer] by El Bruno, licensed under the MIT License

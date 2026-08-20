@@ -1,666 +1,87 @@
-# MarkItDown Web Server
+# MarkItDownServer - Advanced Document Retrieval System
 
-A production-ready web server application built using FastAPI that receives binary data from various document formats and converts them to Markdown using the MarkItDown library.
+Một hệ thống backend API mạnh mẽ được xây dựng bằng **FastAPI**, kết hợp khả năng chuyển đổi tài liệu đa định dạng sang Markdown và tích hợp **RAG (Retrieval-Augmented Generation)** nâng cao sử dụng **LangChain**, **ChromaDB** và **Local LLM (Ollama)**. 
 
-> **💡 Quick Answer: Is there a concurrency limit?**  
-> By default, the server runs with 1 worker and no rate limiting. You can configure workers and rate limits using environment variables.  
-> See [docs/CONCURRENCY_SUMMARY.md](./docs/CONCURRENCY_SUMMARY.md) for a quick guide or [docs/CONCURRENCY.md](./docs/CONCURRENCY.md) for detailed information.
+Dự án này thể hiện kỹ năng xây dựng một ứng dụng AI/Backend hoàn chỉnh, từ việc xử lý file, tối ưu hóa API, cho đến việc ứng dụng các mô hình ngôn ngữ lớn (LLM) để tìm kiếm và truy xuất thông tin ngữ nghĩa.
 
-## 🚀 Features
+##  Các tính năng chính
 
-- **Multiple Format Support**: Convert DOC, DOCX, PPT, PPTX, PDF, XLS, XLSX, ODT, ODS, ODP, and TXT files to Markdown
-- **FastAPI Framework**: Modern, fast, and well-documented REST API
-- **Health Checks**: Built-in health monitoring endpoints
-- **Input Validation**: Comprehensive file size, type, and content validation
-- **Error Handling**: Robust error handling with detailed error messages
-- **CORS Support**: Configurable CORS for web client integration
-- **Security Headers**: Built-in security headers middleware
-- **Docker Support**: Containerized deployment ready
-- **Azure Compatible**: Ready for Azure Container Apps deployment
-- **AI Chat Web App Sample**: Full-featured .NET Aspire application with document upload and RAG chat capabilities (see [samples/AiChatWebApp](./samples/AiChatWebApp/README.md))
+*   **Chuyển đổi đa định dạng sang Markdown**: Hỗ trợ upload và chuyển đổi hàng loạt các định dạng file khác nhau (PDF, DOCX, PPTX, hình ảnh, âm thanh, v.v.) sang Markdown sử dụng thư viện `markitdown` của Microsoft.
+*   **Vector Database (ChromaDB)**: Tự động phân chia nội dung Markdown (Text Splitting dựa trên Header) và nhúng (Embed) thành các vector lưu trữ vào ChromaDB sử dụng `HuggingFaceEmbeddings` (`all-MiniLM-L6-v2`).
+*   **Advanced RAG (Multi-Query Retriever)**: 
+    *   Tích hợp hệ thống truy xuất thông tin nâng cao bằng LangChain.
+    *   Sử dụng **Local LLM (Ollama với mô hình Qwen2)** để tự động sinh ra nhiều câu hỏi phụ (sub-queries) từ câu hỏi gốc của người dùng, giúp tăng độ chính xác và phủ rộng ngữ nghĩa khi tìm kiếm trong Vector DB.
+*   **API Hiện đại & Bảo mật**:
+    *   Xây dựng bằng **FastAPI** cho hiệu năng cao và tự động generate tài liệu API (Swagger UI).
+    *   Tích hợp Middleware bảo mật (CORS, Security Headers).
+    *   Hỗ trợ Rate Limiting (giới hạn request) để bảo vệ server khỏi các đợt tấn công DDoS/Spam (thông qua `slowapi`).
+    *   Quản lý cấu hình qua Environment Variables (số lượng Worker, Port, v.v.).
 
-## 📋 Table of Contents
+##  Tech Stack & Thư viện sử dụng
 
-- [Quick Start](#quick-start)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Samples](#samples)
-- [Configuration](#configuration)
-- [API Documentation](#api-documentation)
-- [Documentation](#documentation)
-- [License](#license)
+*   **Backend Framework**: Python 3.10+, FastAPI, Uvicorn
+*   **AI / RAG Framework**: LangChain (`langchain-text-splitters`, `langchain-huggingface`, `langchain-community`, `langchain-ollama`)
+*   **Vector Database**: ChromaDB
+*   **LLM & Embeddings**: Ollama (Qwen2), HuggingFace (`all-MiniLM-L6-v2`, `sentence-transformers`)
+*   **Document Processing**: `markitdown` (Microsoft)
 
-## ⚡ Quick Start
+##  Cấu trúc thư mục
 
-### Using Docker (Recommended)
-
-```bash
-# Build the Docker image
-docker build -t markitdownserver .
-
-# Run the container
-docker run -d --name markitdownserver -p 8490:8490 markitdownserver
-
-# Test the health endpoint
-curl http://localhost:8490/health
-```
-
-### Using Python (Development)
-
-```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Run the server
-python app.py
-```
-
-The server will be available at `http://localhost:8490`
-
-## 📦 Installation
-
-### Prerequisites
-
-- **Python 3.12+** (for local development)
-- **Docker** (for containerized deployment)
-- **.NET 9.0 SDK** (for running C# client examples)
-
-### Local Development
-
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/elbruno/MarkItDownServer.git
-   cd MarkItDownServer
-   ```
-
-2. **Create a virtual environment** (recommended):
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-
-3. **Install dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Run the server**:
-   ```bash
-   python app.py
-   ```
-
-   The server will start on `http://0.0.0.0:8490`
-
-### Docker Deployment
-
-1. **Build the Docker image**:
-   ```bash
-   docker build -t markitdownserver:latest .
-   ```
-
-2. **Run the container**:
-   ```bash
-   docker run -d \
-     --name markitdownserver \
-     -p 8490:8490 \
-     markitdownserver:latest
-   ```
-
-3. **Verify the container is running**:
-   ```bash
-   docker ps | grep markitdownserver
-   ```
-
-4. **View logs**:
-   ```bash
-   docker logs markitdownserver
-   ```
-
-5. **Stop the container**:
-   ```bash
-   docker stop markitdownserver
-   docker rm markitdownserver
-   ```
-
-## 📖 Usage
-
-### API Endpoints
-
-#### Root Endpoint
-```http
-GET /
-```
-
-Returns service information and available endpoints.
-
-**Response**:
-```json
-{
-  "service": "MarkItDown Server",
-  "description": "API for converting documents to Markdown",
-  "version": "1.0.0",
-  "endpoints": {
-    "health": "/health",
-    "docs": "/docs",
-    "process": "/process_file"
-  }
-}
-```
-
-#### Health Check
-```http
-GET /health
-```
-
-Returns the health status of the service.
-
-**Response**:
-```json
-{
-  "status": "healthy",
-  "timestamp": "2025-01-07T12:00:00",
-  "service": "MarkItDown Server",
-  "version": "1.0.0"
-}
-```
-
-#### Process File
-```http
-POST /process_file
-```
-
-Upload a document file and receive its content in Markdown format.
-
-**Parameters**:
-- `file`: The document file to convert (multipart/form-data)
-
-**Supported File Types**:
-- Microsoft Office: DOC, DOCX, XLS, XLSX, PPT, PPTX
-- PDF: PDF
-- OpenDocument: ODT, ODS, ODP
-- Text: TXT
-
-**File Size Limit**: 50MB
-
-**Response**:
-```json
-{
-  "markdown": "# Document Title\n\nContent in markdown format..."
-}
-```
-
-**Error Responses**:
-- `400 Bad Request`: Invalid file type or empty file
-- `413 Payload Too Large`: File exceeds 50MB
-- `500 Internal Server Error`: Conversion error
-
-### Client Examples
-
-#### Simple Console Application
-
-Located in `samples/SimpleConsole/`, this is a basic example showing minimal code to use the API.
-
-```bash
-cd samples/SimpleConsole
-dotnet run
-```
-
-**Code**:
-```csharp
-using System.Net.Http.Headers;
-
-HttpClient client = new HttpClient();
-string url = "http://127.0.0.1:8490/process_file";
-string filePath = "Benefit_Options.pdf";
-
-using (var content = new MultipartFormDataContent())
-{
-    byte[] fileBytes = File.ReadAllBytes(filePath);
-    var fileContent = new ByteArrayContent(fileBytes);
-    fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse("application/pdf");
-    content.Add(fileContent, "file", Path.GetFileName(filePath));
-
-    var response = await client.PostAsync(url, content);
-    if (response.IsSuccessStatusCode)
-    {
-        string responseBody = await response.Content.ReadAsStringAsync();
-        Console.WriteLine($"MarkDown for {filePath}\n\n{responseBody}");
-    }
-}
-```
-
-#### Detailed Console Application
-
-Located in `samples/DetailedConsole/`, this includes comprehensive error handling, configuration, and features.
-
-```bash
-cd samples/DetailedConsole
-dotnet run
-```
-
-**Features**:
-- Configuration file support (`appsettings.json`)
-- Comprehensive error handling
-- Timeout configuration
-- File validation
-- Colored console output
-- Automatic markdown file saving
-- Content type detection
-
-**Configuration** (`appsettings.json`):
-```json
-{
-  "MarkItDownServer": {
-    "Url": "http://127.0.0.1:8490/process_file",
-    "FilePath": "Benefit_Options.pdf",
-    "TimeoutMinutes": "5"
-  }
-}
-```
-
-#### AI Chat Web App (Full-Featured Sample)
-
-Located in `samples/AiChatWebApp/`, this is a complete .NET Aspire application with:
-- Blazor Server UI with modern chat interface
-- Document upload with drag-and-drop support
-- Integration with GitHub Models for AI chat
-- Retrieval-Augmented Generation (RAG) with vector search
-- Real-time document processing and ingestion
-
-```bash
-cd samples/AiChatWebApp
-# See QUICKSTART.md for detailed setup instructions
-dotnet run --project AiChatWebApp.AppHost
-```
-
-**Features**:
-- Upload documents (PDF, Word, PowerPoint, Excel, Text) through the web UI
-- Documents are automatically converted to Markdown via MarkItDown
-- Chat with your documents using AI
-- Semantic search with citations
-- .NET Aspire orchestration with health monitoring
-
-For complete documentation, see [samples/AiChatWebApp/README.md](./samples/AiChatWebApp/README.md) or [QUICKSTART.md](./samples/AiChatWebApp/QUICKSTART.md).
-
-#### cURL Example
-
-```bash
-curl -X POST "http://localhost:8490/process_file" \
-  -F "file=@document.pdf" \
-  -H "Content-Type: multipart/form-data"
-```
-
-#### Python Example
-
-```python
-import requests
-
-url = "http://localhost:8490/process_file"
-files = {"file": open("document.pdf", "rb")}
-
-response = requests.post(url, files=files)
-if response.status_code == 200:
-    markdown = response.json()["markdown"]
-    print(markdown)
-else:
-    print(f"Error: {response.status_code}")
-    print(response.json())
-```
-
-#### PowerShell Example
-
-```powershell
-$url = "http://localhost:8490/process_file"
-$filePath = "document.pdf"
-
-$fileContent = [System.IO.File]::ReadAllBytes($filePath)
-$boundary = [System.Guid]::NewGuid().ToString()
-$LF = "`r`n"
-
-$bodyLines = (
-    "--$boundary",
-    "Content-Disposition: form-data; name=`"file`"; filename=`"$(Split-Path $filePath -Leaf)`"",
-    "Content-Type: application/pdf$LF",
-    [System.Text.Encoding]::UTF8.GetString($fileContent),
-    "--$boundary--$LF"
-) -join $LF
-
-Invoke-RestMethod -Uri $url -Method Post -ContentType "multipart/form-data; boundary=$boundary" -Body $bodyLines
-```
-
-## ⚙️ Configuration
-
-### Environment Variables
-
-The server can be configured using environment variables:
-
-- `PORT`: Server port (default: 8490)
-- `HOST`: Server host (default: 0.0.0.0)
-- `MAX_FILE_SIZE`: Maximum file size in bytes (default: 52428800 = 50MB)
-- `LOG_LEVEL`: Logging level (default: INFO)
-- `WORKERS`: Number of worker processes (default: 1)
-- `ENABLE_RATE_LIMIT`: Enable rate limiting (default: false)
-- `RATE_LIMIT`: Rate limit (default: 60/minute)
-
-### Docker Environment
-
-```bash
-docker run -d \
-  --name markitdownserver \
-  -p 8490:8490 \
-  -e PORT=8490 \
-  -e MAX_FILE_SIZE=104857600 \
-  -e WORKERS=4 \
-  -e ENABLE_RATE_LIMIT=true \
-  -e RATE_LIMIT=100/minute \
-  markitdownserver:latest
-```
-
-## 🚦 Concurrency and Performance
-
-### Default Behavior
-
-By default, the server runs with:
-- **1 worker process** (single worker)
-- **Async request handling** via FastAPI
-- **No rate limiting**
-
-### Configuring Concurrency
-
-**Multi-worker setup** for better performance:
-```bash
-# Run with 4 workers
-docker run -d -p 8490:8490 -e WORKERS=4 markitdownserver:latest
-```
-
-**Enable rate limiting** to prevent abuse:
-```bash
-# Limit to 100 requests per minute per IP
-docker run -d -p 8490:8490 \
-  -e ENABLE_RATE_LIMIT=true \
-  -e RATE_LIMIT=100/minute \
-  markitdownserver:latest
-```
-
-**Note**: Rate limiting requires `slowapi` package. Install with:
-```bash
-pip install slowapi
-```
-
-### Performance Recommendations
-
-- **Small scale** (< 100 req/min): 1-2 workers
-- **Medium scale** (100-1000 req/min): 2-4 workers  
-- **Large scale** (> 1000 req/min): Use horizontal scaling with load balancer
-
-**📚 For detailed concurrency information**, see [docs/CONCURRENCY.md](./docs/CONCURRENCY.md)
-
-## 🧪 Testing
-
-### Test the Server
-
-1. **Start the server**:
-   ```bash
-   python app.py
-   ```
-
-2. **Run health check**:
-   ```bash
-   curl http://localhost:8490/health
-   ```
-
-3. **Test file conversion**:
-   ```bash
-   curl -X POST "http://localhost:8490/process_file" \
-     -F "file=@samples/SimpleConsole/Benefit_Options.pdf"
-   ```
-
-### Run Client Examples
-
-**Simple Console**:
-```bash
-cd samples/SimpleConsole
-dotnet run
-```
-
-**Detailed Console**:
-```bash
-cd samples/DetailedConsole
-dotnet run
-```
-
-## 🚀 Deployment
-
-### Local Deployment
-
-For development and testing:
-
-```bash
-# Using Python
-python app.py
-
-# Using uvicorn directly
-uvicorn app:app --host 0.0.0.0 --port 8490 --reload
-```
-
-### Docker Deployment
-
-For production:
-
-```bash
-# Build
-docker build -t markitdownserver:1.0.0 .
-
-# Run
-docker run -d \
-  --name markitdownserver \
-  -p 8490:8490 \
-  --restart unless-stopped \
-  markitdownserver:1.0.0
-
-# View logs
-docker logs -f markitdownserver
-```
-
-### Azure Container Apps
-
-See the comprehensive [docs/CODE_QUALITY_IMPROVEMENTS.md](./docs/CODE_QUALITY_IMPROVEMENTS.md) document for detailed Azure deployment instructions, including:
-
-- Multi-stage Dockerfile optimization
-- Azure CLI deployment scripts
-- Bicep templates for Infrastructure as Code
-- Environment configuration
-- Security best practices
-- Cost estimation and optimization
-
-**Quick Azure Deployment**:
-
-```bash
-# Set variables
-RESOURCE_GROUP="rg-markitdown"
-LOCATION="eastus"
-CONTAINER_APP_NAME="markitdown-server"
-
-# Create resource group
-az group create --name $RESOURCE_GROUP --location $LOCATION
-
-# Deploy (see docs/CODE_QUALITY_IMPROVEMENTS.md for complete script)
-az containerapp up \
-  --name $CONTAINER_APP_NAME \
-  --resource-group $RESOURCE_GROUP \
-  --location $LOCATION \
-  --source .
-```
-
-## 👨‍💻 Development
-
-### Project Structure
-
-```
+```text
 MarkItDownServer/
-├── app.py                          # Main FastAPI application
-├── requirements.txt                # Python dependencies
-├── dockerfile                      # Docker configuration
-├── README.md                       # This file
-├── docs/                           # Comprehensive documentation
-├── samples/
-│   ├── SimpleConsole/              # Basic C# client example
-│   │   ├── Program.cs
-│   │   ├── SimpleConsole.csproj
-│   │   └── Benefit_Options.pdf
-│   └── DetailedConsole/            # Advanced C# client example
-│       ├── Program.cs
-│       ├── DetailedConsole.csproj
-│       ├── appsettings.json
-│       └── Benefit_Options.pdf
-├── src/                            # Legacy client (preserved)
-│   └── ...
-└── utils/
-    └── file_handler.py             # Utility functions
+├── app.py                 # File chính chạy FastAPI server, định nghĩa các API endpoints
+├── utils/
+│   └── vector_handler.py  # Xử lý logic LangChain, ChromaDB, và Ollama
+├── chroma_db/             # Thư mục lưu trữ dữ liệu Vector Database (Local)
+├── requirements.txt       # Danh sách dependencies của dự án
+└── Dockerfile             # (Tùy chọn) Cấu hình để chạy server trong container
 ```
 
-### Adding New Features
+##  API Endpoints
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+*   `GET /`: Trả về thông tin cơ bản của service.
+*   `GET /health`: Kiểm tra trạng thái hoạt động của server.
+*   `POST /process_file`: API upload file. File sau khi upload sẽ được:
+    1. Chuyển đổi sang Markdown.
+    2. Băm nhỏ (Chunking) theo các thẻ Header (`#`, `##`, `###`).
+    3. Nhúng (Embedding) và lưu vào ChromaDB (collection `ielts_materials`).
+*   `POST /query`: Nhận câu hỏi từ người dùng, dùng LLM sinh ra các câu hỏi phụ, tìm kiếm trong Vector DB và trả về các đoạn nội dung liên quan nhất.
 
-### Code Quality
+##  Hướng dẫn cài đặt và chạy thử nghiệm
 
-The project follows Python best practices:
-- Type hints for better code clarity
-- Comprehensive error handling
-- Input validation
-- Security headers
-- Structured logging
+### 1. Yêu cầu hệ thống
+*   Python 3.10 trở lên.
+*   Cài đặt [Ollama](https://ollama.com/) và tải mô hình Qwen2:
+    ```bash
+    ollama run qwen2
+    ```
 
-## 📚 API Documentation
+### 2. Cài đặt dependencies
+Tạo môi trường ảo và cài đặt các thư viện cần thiết:
 
-The server provides automatic interactive API documentation:
-
-- **Swagger UI**: http://localhost:8490/docs
-- **ReDoc**: http://localhost:8490/redoc
-
-These interfaces allow you to:
-- Explore all available endpoints
-- Test API calls directly from the browser
-- View request/response schemas
-- See example requests and responses
-
-## 📦 Dependencies
-
-### Python Dependencies
-
-- **fastapi** (0.115.5): Modern web framework for building APIs
-- **uvicorn** (0.32.1): ASGI server for FastAPI
-- **python-multipart** (0.0.20): Multipart form data support
-- **markitdown** (0.0.1a2): Document to Markdown conversion
-- **pydantic** (2.10.3): Data validation using Python type hints
-
-### System Requirements
-
-- Python 3.12 or higher
-- 512MB RAM minimum (1GB recommended)
-- 100MB disk space
-
-## 🔍 Troubleshooting
-
-### Server won't start
-
-**Issue**: Port already in use
-```
-Error: [Errno 48] Address already in use
-```
-
-**Solution**: Change the port or stop the conflicting service
 ```bash
-# Find process using port 8490
-lsof -i :8490
-
-# Kill the process
-kill -9 <PID>
-
-# Or use a different port
-python app.py --port 8491
+python -m venv venv
+source venv/bin/activate  # (Trên Windows: venv\Scripts\activate)
+pip install -r requirements.txt
 ```
 
-### File conversion fails
+*(Lưu ý: Nếu cần dùng tính năng Rate Limit, hãy chạy thêm `pip install slowapi`)*
 
-**Issue**: "File type not allowed"
+### 3. Khởi chạy Server
+Khởi chạy FastAPI server:
 
-**Solution**: Ensure your file has a supported extension (doc, docx, pdf, etc.)
-
-**Issue**: "File too large"
-
-**Solution**: Files must be under 50MB. Compress or split large files.
-
-### Docker issues
-
-**Issue**: Cannot connect to Docker daemon
-
-**Solution**: Ensure Docker Desktop is running
 ```bash
-docker ps  # Test Docker connection
+python app.py
 ```
+Mặc định server sẽ chạy tại: `http://localhost:8490`
 
-**Issue**: Container exits immediately
+*   Truy cập Swagger UI (Tài liệu API): `http://localhost:8490/docs`
 
-**Solution**: Check container logs
-```bash
-docker logs markitdownserver
-```
+## Điểm nổi bật cho Nhà tuyển dụng (Why this project?)
 
-## 📞 Support
-
-For issues, questions, or contributions:
-
-- **GitHub Issues**: [Create an issue](https://github.com/elbruno/MarkItDownServer/issues)
-- **Documentation**: See [docs/](./docs/)
-
-## 📄 License
-
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- Built with [FastAPI](https://fastapi.tiangolo.com/)
-- Powered by [MarkItDown](https://github.com/microsoft/markitdown)
-- Developed by [El Bruno](https://github.com/elbruno)
-
-## 📚 Documentation
-
-Comprehensive documentation is available in the [docs](./docs/) directory:
-
-- **[Quick Reference](./docs/QUICK_REFERENCE.md)** - Common commands and API usage
-- **[Developer Manual](./docs/DEVELOPER_MANUAL.md)** - Integration guide for developers
-- **[Concurrency Guide](./docs/CONCURRENCY.md)** - Performance and scaling information
-- **[Code Quality](./docs/CODE_QUALITY_IMPROVEMENTS.md)** - Best practices and improvements
-- **[Implementation Plans](./docs/plans/)** - Detailed feature implementation plans
-
-### Sample Applications
-
-- **[AI Chat Web App](./samples/AiChatWebApp/)** - Full .NET Aspire application with:
-  - Document upload and conversion
-  - RAG-based chat with semantic search
-  - Vector store integration
-  - Real-time markdown preview
-  - [Quick Start Guide](./samples/AiChatWebApp/QUICKSTART.md)
-  - [User Manual](./samples/AiChatWebApp/docs/USER_MANUAL.md) *(coming soon)*
-
-## 📈 Version History
-
-- **v1.0.0** (2025-01): Initial release with production-ready features
-  - Multi-format document conversion
-  - Comprehensive error handling
-  - Health check endpoints
-  - Docker support
-  - Azure deployment ready
-  - AI Chat Web App sample with .NET Aspire
-
----
-
-**Ready to convert your documents to Markdown?** 🚀
-
-Start the server and visit http://localhost:8490/docs to explore the interactive API documentation!
+Dự án này không chỉ là một ứng dụng CRUD thông thường mà còn giải quyết được bài toán xây dựng luồng xử lý AI (AI Pipeline) hoàn chỉnh:
+1.  **Kiến trúc RAG**: Hiểu và triển khai được mô hình RAG - xu hướng cốt lõi trong việc xây dựng các ứng dụng GenAI doanh nghiệp (Enterprise AI).
+2.  **Khả năng tối ưu tìm kiếm**: Sử dụng `MultiQueryRetriever` chứng tỏ sự am hiểu về hạn chế của tìm kiếm vector thuần túy (lexical/semantic gap) và cách dùng LLM để bù đắp.
+3.  **Clean Code & Modular Design**: Tách biệt rõ ràng tầng API (FastAPI) và tầng logic xử lý AI (LangChain/VectorDB).
+4.  **Tư duy hệ thống**: Áp dụng các phương pháp bảo mật (Security headers), tối ưu luồng (Rate limiting), phân mảnh file (Chunking strategy dựa trên Markdown headers thay vì cắt ký tự mù quáng).
+5.  **Kinh nghiệm xử lý sự cố thực tế**: Hiểu rõ và xử lý triệt để các vấn đề Encoding (UTF-8 vs cp1252) thường gặp khi triển khai hệ thống đa nền tảng (Windows/Linux), giúp log và hệ thống chạy mượt mà với dữ liệu tiếng Việt.

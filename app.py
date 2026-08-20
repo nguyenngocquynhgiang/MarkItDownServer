@@ -1,6 +1,13 @@
 import logging
 import os
 import sys
+
+# Force UTF-8 encoding for standard output (Fixes Windows charmap error)
+if sys.stdout.encoding.lower() != 'utf-8':
+    sys.stdout.reconfigure(encoding='utf-8')
+if sys.stderr.encoding.lower() != 'utf-8':
+    sys.stderr.reconfigure(encoding='utf-8')
+
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -10,9 +17,11 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from markitdown import MarkItDown
+from utils.vector_handler import process_and_store_markdown, get_existing_vector_db, get_advanced_retriever
 
 # Optional rate limiting support
 try:
+    # pyrefly: ignore [missing-import]
     from slowapi import Limiter, _rate_limit_exceeded_handler
     from slowapi.util import get_remote_address
     from slowapi.errors import RateLimitExceeded
@@ -38,14 +47,6 @@ app = FastAPI(
     title="MarkItDown Server",
     description="API for converting various document formats to Markdown",
     version="1.0.0",
-    contact={
-        "name": "El Bruno",
-        "url": "https://github.com/elbruno/MarkItDownServer",
-    },
-    license_info={
-        "name": "MIT",
-        "url": "https://github.com/elbruno/MarkItDownServer/blob/main/LICENSE",
-    },
 )
 
 # Add CORS middleware
@@ -89,6 +90,10 @@ ALLOWED_EXTENSIONS = {
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
 
 # Response models
+class QueryRequest(BaseModel):
+    question: str
+    top_k: int = 3
+
 class MarkdownResponse(BaseModel):
     markdown: str
 
@@ -226,7 +231,14 @@ async def process_file(
         markdown_content = convert_to_md(temp_file_path)
         logger.info("File converted to markdown successfully")
         
-        return JSONResponse(content={'markdown': markdown_content})
+        # Gọi luồng INGEST: Băm nhỏ và lưu mới/lưu thêm vào ChromaDB
+        process_and_store_markdown(markdown_content, collection_name="ielts_materials")
+        
+        return JSONResponse(content={
+            "status": "success",
+            "message": "File đã được chuyển đổi sang Markdown và nạp vào Vector DB thành công!",
+            "collection": "ielts_materials"
+        })
         
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
@@ -237,6 +249,35 @@ async def process_file(
         if temp_file_path and os.path.exists(temp_file_path):
             os.remove(temp_file_path)
             logger.info(f"Temporary file deleted: {temp_file_path}")
+
+@app.post("/query")
+async def query_documents(request: QueryRequest):
+    try:
+        # Sử dụng Advanced Retriever thay vì Vector DB thuần
+        advanced_retriever = get_advanced_retriever(collection_name="ielts_materials")
+        
+        # Hàm invoke() sẽ tự động làm mọi việc: gọi LLM tạo câu hỏi -> tìm DB -> gộp kết quả
+        relevant_docs = advanced_retriever.invoke(request.question)
+        
+        results = []
+        for doc in relevant_docs:
+            results.append({
+                "content": doc.page_content,
+                "metadata": doc.metadata
+            })
+            
+        return {
+            "status": "success",
+            "query": request.question,
+            "total_docs_found": len(results), # Số lượng có thể lớn hơn top_k do tìm từ nhiều câu
+            "results": results
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Lỗi xảy ra khi truy vấn dữ liệu: {str(e)}"
+        }
+
 
 if __name__ == "__main__":
     import uvicorn
